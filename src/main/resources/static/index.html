@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Chatbot</title>
+  <meta name="description" content="A simple web chatbot backed by an OpenAI-compatible API." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- marked.js: safe, pinned version for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-row">
+        <div>
+          <h1>Simple Chatbot</h1>
+          <p class="subtitle">Backed by an OpenAI-compatible API</p>
+        </div>
+        <button id="clear-button" type="button" title="Clear conversation">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Clear
+        </button>
+      </div>
+    </header>
+
+    <main id="messages" class="messages" aria-live="polite"></main>
+
+    <div id="error-banner" class="error-banner" hidden></div>
+
+    <form id="chat-form" class="chat-form">
+      <textarea
+        id="message-input"
+        placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
+        rows="1"
+        autocomplete="off"
+        required
+      ></textarea>
+      <button id="send-button" type="submit">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+        </svg>
+      </button>
+    </form>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

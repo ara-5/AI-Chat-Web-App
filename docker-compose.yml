@@ -1,0 +1,11 @@
+# Optional convenience file for local development.
+# Usage: cp .env.example .env  (fill in your key)  &&  docker compose up --build
+services:
+  chatbot:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}

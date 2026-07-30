@@ -1,0 +1,280 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2e38;
+  --text: #e6e8ec;
+  --muted: #8b93a1;
+  --accent: #4f8cff;
+  --user-bubble: #4f8cff;
+  --assistant-bubble: #1e2130;
+  --error: #ff5c5c;
+  --code-bg: #0d1117;
+  --code-border: #30363d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.app {
+  max-width: 780px;
+  margin: 0 auto;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+}
+
+/* ─── Header ─────────────────────────────────────────────── */
+
+header {
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+#clear-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+#clear-button:hover {
+  color: var(--error);
+  border-color: var(--error);
+  background: rgba(255, 92, 92, 0.07);
+}
+
+/* ─── Messages ───────────────────────────────────────────── */
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+
+.message {
+  max-width: 82%;
+  padding: 11px 15px;
+  border-radius: 16px;
+  line-height: 1.55;
+  word-wrap: break-word;
+}
+
+.message.user {
+  align-self: flex-end;
+  background: var(--user-bubble);
+  color: white;
+  border-bottom-right-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.message.assistant {
+  align-self: flex-start;
+  background: var(--assistant-bubble);
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+/* ─── Markdown inside assistant messages ─────────────────── */
+
+.message.assistant p { margin: 0 0 0.65em; }
+.message.assistant p:last-child { margin-bottom: 0; }
+.message.assistant ul,
+.message.assistant ol { margin: 0.4em 0; padding-left: 1.4em; }
+.message.assistant li { margin-bottom: 0.25em; }
+.message.assistant h1,
+.message.assistant h2,
+.message.assistant h3 {
+  margin: 0.7em 0 0.35em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.message.assistant h1 { font-size: 1.1em; }
+.message.assistant h2 { font-size: 1.0em; }
+.message.assistant h3 { font-size: 0.95em; }
+.message.assistant a { color: var(--accent); text-decoration: underline; }
+.message.assistant strong { font-weight: 600; }
+.message.assistant em { font-style: italic; }
+.message.assistant hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.75em 0;
+}
+
+/* Inline code */
+.message.assistant code {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.875em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #e3b341;
+}
+
+/* Code blocks */
+.message.assistant pre {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.6em 0;
+}
+
+.message.assistant pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #e6edf3;
+  font-size: 0.875em;
+  white-space: pre;
+}
+
+/* Blockquote */
+.message.assistant blockquote {
+  border-left: 3px solid var(--accent);
+  margin: 0.5em 0;
+  padding: 0.25em 0 0.25em 0.85em;
+  color: var(--muted);
+}
+
+/* ─── Typing indicator ───────────────────────────────────── */
+
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 2px;
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  background: var(--muted);
+  border-radius: 50%;
+  animation: bounce 1.2s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(1) { animation-delay: 0s; }
+.typing-indicator span:nth-child(2) { animation-delay: 0.18s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30%            { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ─── Error banner ───────────────────────────────────────── */
+
+.error-banner {
+  background: rgba(255, 92, 92, 0.10);
+  border: 1px solid var(--error);
+  color: var(--error);
+  padding: 9px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Input form ─────────────────────────────────────────── */
+
+.chat-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 0 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#message-input {
+  flex: 1;
+  resize: none;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  max-height: 140px;
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+
+#message-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+#message-input::placeholder { color: var(--muted); }
+
+#send-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+#send-button:hover { opacity: 0.88; }
+#send-button:active { transform: scale(0.95); }
+
+#send-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
