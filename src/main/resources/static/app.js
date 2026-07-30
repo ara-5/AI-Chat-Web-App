@@ -3,8 +3,8 @@
 
   // ── Configure marked (markdown parser) ──────────────────────────────────────
   marked.setOptions({
-    gfm: true,       // GitHub-flavoured markdown
-    breaks: true,    // Single newlines become <br>
+    gfm: true,     // GitHub-flavoured markdown
+    breaks: true,  // single newlines → <br>
   });
 
   // ── DOM refs ─────────────────────────────────────────────────────────────────
@@ -16,17 +16,16 @@
   const clearButton = document.getElementById("clear-button");
 
   // ── Conversation state ───────────────────────────────────────────────────────
-  // History is maintained client-side and sent with every request so the
+  // History is maintained client-side and replayed on every request so the
   // backend stays stateless. Excludes the in-flight message.
   let history = [];
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   function renderMarkdown(text) {
-    // 1. marked.parse() converts markdown to HTML.
-    // 2. DOMPurify.sanitize() strips any dangerous tags/attributes before
-    //    the HTML is injected into the DOM via innerHTML — prevents XSS if
-    //    the upstream model returns malicious HTML in its response.
+    // marked.parse() converts markdown → HTML.
+    // DOMPurify.sanitize() strips dangerous tags/attributes before the HTML is
+    // written to innerHTML — prevents XSS from malicious model responses.
     const rawHtml = marked.parse(text, { mangle: false, headerIds: false });
     return DOMPurify.sanitize(rawHtml);
   }
@@ -34,7 +33,7 @@
   function appendUserMessage(text) {
     const div = document.createElement("div");
     div.className = "message user";
-    div.textContent = text;           // user text is never parsed as markdown
+    div.textContent = text; // user text is never parsed as markdown
     messagesEl.appendChild(div);
     scrollToBottom();
     return div;
@@ -81,158 +80,100 @@
     input.style.height = Math.min(input.scrollHeight, 140) + "px";
   }
 
-  // ── Streaming send ────────────────────────────────────────────────────────────
+  // ── SSE streaming send ────────────────────────────────────────────────────────
+  //
+  // We use fetch() with method POST rather than the native EventSource API
+  // because EventSource only supports GET requests and cannot send a JSON body.
+  //
+  // The response body is piped through TextDecoderStream to get a string reader,
+  // then consumed line-by-line. Each SSE event is two lines:
+  //   event: <name>
+  //   data:  <payload>
+  // followed by a blank line. We track the current event name across lines.
 
   async function sendMessageStreaming(text) {
-    return new Promise((resolve, reject) => {
-      // POST the chat request and receive an SSE stream back.
-      // We use fetch rather than EventSource because EventSource only supports GET.
-      fetch("/api/chat/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history }),
-      })
-        .then((response) => {
-          if (!response.ok) {
-            // Non-2xx before any streaming starts (e.g. 400 validation error)
-            return response.json().catch(() => null).then((data) => {
-              reject(new Error(data?.message ?? `Request failed (HTTP ${response.status})`));
-            });
-          }
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, history }),
+    });
 
-          const placeholderEl = appendAssistantPlaceholder();
-          let accumulated     = "";
-          let firstToken      = true;
+    if (!response.ok) {
+      // Non-2xx before streaming starts (e.g. 400 validation error from Spring)
+      const data = await response.json().catch(() => null);
+      throw new Error(data?.message ?? `Request failed (HTTP ${response.status})`);
+    }
 
-          const reader  = response.body.getReader();
-          const decoder = new TextDecoder();
-          let   buffer  = "";
+    const placeholderEl = appendAssistantPlaceholder();
+    let accumulated  = "";
+    let isFirstToken = true;
+    let currentEvent = null;
+    let textBuffer   = "";
 
-          // ReadableStream reader: parses the raw SSE bytes
-          function pump() {
-            reader.read().then(({ done, value }) => {
-              if (done) {
-                // Stream closed without a [DONE] sentinel — treat as complete.
-                finaliseAssistantMessage(placeholderEl, accumulated);
-                resolve(accumulated);
-                return;
+    // Pipe the response body through TextDecoderStream and read line-by-line.
+    // response.body is consumed exactly once — no double-pipe, no locked-stream errors.
+    const reader = response.body
+      .pipeThrough(new TextDecoderStream())
+      .getReader();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          // Stream closed without a done event — treat accumulated text as complete.
+          finaliseAssistantMessage(placeholderEl, accumulated);
+          return accumulated;
+        }
+
+        textBuffer += value;
+
+        // Split on newlines; keep the incomplete last fragment in the buffer.
+        const lines = textBuffer.split("\n");
+        textBuffer = lines.pop();
+
+        for (const rawLine of lines) {
+          const line = rawLine.trimEnd();
+
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7);
+
+          } else if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+
+            if (currentEvent === "token") {
+              if (isFirstToken) {
+                placeholderEl.innerHTML = ""; // clear typing indicator
+                isFirstToken = false;
               }
+              accumulated += data;
+              // Live-render partial markdown as tokens stream in
+              placeholderEl.innerHTML = renderMarkdown(accumulated);
+              scrollToBottom();
 
-              buffer += decoder.decode(value, { stream: true });
+            } else if (currentEvent === "done") {
+              finaliseAssistantMessage(placeholderEl, accumulated);
+              reader.cancel();
+              return accumulated;
 
-              // SSE lines are separated by "\n"; events by "\n\n"
-              const lines = buffer.split("\n");
-              buffer = lines.pop(); // keep incomplete last line
-
-              for (const line of lines) {
-                if (line.startsWith("event: error")) continue;   // handled next line
-                if (line.startsWith("data: ")) {
-                  const data = line.slice(6);
-                  // error data line
-                  if (buffer.includes("event: error") || previousLineWasError) {
-                    finaliseAssistantMessage(placeholderEl, accumulated || "");
-                    reject(new Error(data));
-                    reader.cancel();
-                    return;
-                  }
-                }
-                if (line.startsWith("event: done")) {
-                  finaliseAssistantMessage(placeholderEl, accumulated);
-                  resolve(accumulated);
-                  reader.cancel();
-                  return;
-                }
-                if (line.startsWith("event: token")) {
-                  // token data is on the next line — handled below
-                }
-              }
-
-              // Simpler, more robust SSE parsing:
-              // Re-parse accumulated buffer as named events
-              pump();
-            }).catch((err) => {
-              reject(err);
-            });
-          }
-
-          // ── Robust SSE event parser ────────────────────────────────────────
-          // Use a TransformStream-based line-by-line approach for reliability.
-          let currentEvent = null;
-          let previousLineWasError = false;
-
-          async function pumpLines() {
-            const lineReader = response.body
-              .pipeThrough(new TextDecoderStream())
-              .pipeThrough(new TransformStream({
-                transform(chunk, controller) {
-                  for (const char of chunk) controller.enqueue(char);
-                },
-              }));
-
-            // Collect characters into lines
-            let lineBuffer = "";
-            const lineStream = response.body
-              .pipeThrough(new TextDecoderStream());
-
-            const lineReaderStream = lineStream.getReader();
-
-            let textBuffer = "";
-            let isFirstToken = true;
-
-            async function processChunk() {
-              const { done, value } = await lineReaderStream.read();
-              if (done) {
-                finaliseAssistantMessage(placeholderEl, accumulated);
-                resolve(accumulated);
-                return;
-              }
-
-              textBuffer += value;
-              const parts = textBuffer.split("\n");
-              textBuffer = parts.pop();
-
-              for (const rawLine of parts) {
-                const line = rawLine.trimEnd();
-                if (line.startsWith("event: ")) {
-                  currentEvent = line.slice(7);
-                } else if (line.startsWith("data: ")) {
-                  const data = line.slice(6);
-                  if (currentEvent === "token") {
-                    if (isFirstToken) {
-                      // Replace the typing indicator with empty content
-                      placeholderEl.innerHTML = "";
-                      isFirstToken = false;
-                    }
-                    accumulated += data;
-                    // Live-render partial markdown as tokens arrive
-                    placeholderEl.innerHTML = renderMarkdown(accumulated);
-                    scrollToBottom();
-                  } else if (currentEvent === "done") {
-                    finaliseAssistantMessage(placeholderEl, accumulated);
-                    resolve(accumulated);
-                    return;
-                  } else if (currentEvent === "error") {
-                    placeholderEl.remove();
-                    reject(new Error(data));
-                    return;
-                  }
-                  currentEvent = null;
-                }
-              }
-
-              await processChunk();
+            } else if (currentEvent === "error") {
+              placeholderEl.remove();
+              reader.cancel();
+              throw new Error(data);
             }
 
-            await processChunk();
+            currentEvent = null; // reset after each data line
           }
-
-          pumpLines().catch(reject);
-        })
-        .catch(reject);
-    });
+          // blank lines (SSE event separators) are ignored implicitly
+        }
+      }
+    } catch (err) {
+      reader.cancel().catch(() => {});
+      throw err;
+    }
   }
 
-  // ── Form submit handler ───────────────────────────────────────────────────────
+  // ── Form submit ───────────────────────────────────────────────────────────────
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -247,7 +188,7 @@
 
     try {
       const reply = await sendMessageStreaming(text);
-      // Only push to history after a successful round-trip
+      // Push to history only after a successful round-trip
       history.push({ role: "user",      content: text  });
       history.push({ role: "assistant", content: reply });
     } catch (err) {
