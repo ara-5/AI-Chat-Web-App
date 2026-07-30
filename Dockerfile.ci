@@ -1,0 +1,27 @@
+# Runtime-only image used by CI.
+#
+# The build-and-test job compiles the project and uploads chatbot.jar as an
+# artifact. The docker job downloads it and builds only this lightweight
+# runtime image — no JDK, no Maven wrapper download, no duplicate compile.
+#
+# For a fully self-contained local build (no pre-built JAR needed) use the
+# root Dockerfile instead:
+#   docker build -t chatbot:local .
+
+FROM eclipse-temurin:25-jre AS runtime
+WORKDIR /app
+
+RUN useradd --system --create-home --shell /usr/sbin/nologin appuser
+
+# JAR is placed in target/ by the CI download-artifact step
+COPY target/chatbot.jar app.jar
+RUN chown appuser:appuser app.jar
+USER appuser
+
+EXPOSE 8080
+ENV PORT=8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:${PORT}/api/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -1,15 +1,20 @@
 # ---- Build stage ----
+# Compiles the project from source inside Docker.
+# Used for local `docker build .` or `docker compose up --build`.
+# CI uses Dockerfile.ci with a pre-built JAR instead (faster, more reliable).
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /build
 
-# Cache dependencies separately from source for faster rebuilds.
 COPY mvnw .
 COPY .mvn .mvn
 COPY pom.xml .
-RUN chmod +x mvnw && ./mvnw -B dependency:go-offline
-
 COPY src src
-RUN ./mvnw -B clean package -DskipTests
+
+# Single combined step: Maven downloads dependencies and compiles in one pass.
+# The dependency:go-offline optimisation is omitted here because the Maven
+# wrapper itself must download Maven from the internet first, which makes the
+# separate caching layer unreliable in restricted Docker networking environments.
+RUN chmod +x mvnw && ./mvnw -B clean package -DskipTests
 
 # ---- Runtime stage ----
 FROM eclipse-temurin:25-jre AS runtime
