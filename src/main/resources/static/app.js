@@ -23,10 +23,12 @@
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   function renderMarkdown(text) {
-    // DOMPurify is not bundled — use marked's built-in sanitisation settings.
-    // marked 12+ renders HTML entities safely when sanitize is omitted, but we
-    // also set mangle:false / headerIds:false to avoid the deprecation warnings.
-    return marked.parse(text, { mangle: false, headerIds: false });
+    // 1. marked.parse() converts markdown to HTML.
+    // 2. DOMPurify.sanitize() strips any dangerous tags/attributes before
+    //    the HTML is injected into the DOM via innerHTML — prevents XSS if
+    //    the upstream model returns malicious HTML in its response.
+    const rawHtml = marked.parse(text, { mangle: false, headerIds: false });
+    return DOMPurify.sanitize(rawHtml);
   }
 
   function appendUserMessage(text) {
